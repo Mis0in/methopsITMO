@@ -3,6 +3,7 @@ import math
 
 # ---differentation and gradient---
 
+#TODO change to sqrt(e) * x
 def get_dx(dim, index, eps=1e-8):
     dx = np.zeros(dim)
     dx[index] = eps
@@ -36,6 +37,8 @@ def gradient_descent(f, start, lrate = identity_one, search = identity_one, iter
         grad = approximate_gradient(f, x)
         u = -grad #direction is antigradient
 
+        #to not copy paste this algorithm we are using 2 constants (alpha and lrate), instead of 1 (lrate)
+        #in correct usage only one constant reassigned, while other is just id_one
         alpha = search(f, x, u)  
         x += alpha * lrate(k) * u 
 
@@ -67,6 +70,8 @@ def armijo_rule(f, x, direction, alpha=0.5, q=0.5, c=0.5):
             return alpha
         else:
             alpha *= q
+
+#TODO add another search algo
 
 # ---testing, examples---
 
