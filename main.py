@@ -4,8 +4,6 @@ from prettytable import PrettyTable
 from typing import Callable, Tuple
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import random
-
 
 # === Constants
 
@@ -14,8 +12,8 @@ Scheduling = Callable[[int], float]
 
 SYSTEM_EPS = np.sqrt(np.finfo(float).eps)
 
-
 # === Function wrapper
+
 
 class Func:
     Type = Callable[..., float]
@@ -41,7 +39,33 @@ class Func:
         return gradient
 
 
-# === 3D-visualization of Func with path trajectory if given
+def plot_trajectory(func: Callable[[np.ndarray], float], trajectory) -> None:
+    trajectory = np.array(trajectory)
+    xs = trajectory.flatten()
+    fs = np.array([func(np.array([x])) for x in xs])
+
+    plt.figure(figsize=(10, 6))
+    x_min, x_max = xs.min(), xs.max()
+    pad = max(1.0, (x_max - x_min) * 0.2)
+
+    x_grid = np.linspace(x_min - pad, x_max + pad, 200)
+    f_grid = np.array([func(np.array([x])) for x in x_grid])
+
+    plt.plot(x_grid, f_grid, "b-", label="Функция")
+    plt.plot(xs, fs, "ro-", markersize=4, linewidth=1.5, label="Траектория")
+    plt.scatter(xs[0], fs[0], c="green", marker="s", s=100, label="Начало")
+    plt.scatter(xs[-1], fs[-1], c="blue", marker="*", s=150, label="Конец")
+
+    plt.xlabel("x", fontsize=12)
+    plt.ylabel("f(x)", fontsize=12)
+    plt.title("Траектория градиентного спуска (1D)", fontsize=14)
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig("gd_1d.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
 
 def plot_3d_func(
     func: Func,
@@ -82,26 +106,33 @@ def plot_3d_func(
     ax.set_title("3D график Func")
 
     ax.legend()
-    
-    plt.savefig("gd.png")
-    #plt.show()
+    plt.savefig("gd.png", dpi=150, bbox_inches="tight")
 
-def try_draw_gradient(func, draw3d, trajectory):
-    #if draw and trajectory is not None:
-        #plot_trajectory(func, trajectory)
 
-    if draw3d and trajectory is not None:
+def try_draw_gradient(
+    func: Callable[[np.ndarray], float], draw2d: bool, draw3d: bool, trajectory
+) -> None:
+    if trajectory is None:
+        return
+
+    if draw2d:
+        plot_trajectory(func, trajectory)
+
+    if draw3d:
         xs = [pt[0] for pt in trajectory]
         ys = [pt[1] for pt in trajectory]
-        pad = 5
+        pad = max(1.0, max(np.ptp(xs), np.ptp(ys))) * 0.2
         x_range = (min(xs) - pad, max(xs) + pad)
         y_range = (min(ys) - pad, max(ys) + pad)
-        plot_3d_func(func, x_range, y_range, steps=50, trajectory=trajectory) 
-          
+        plot_3d_func(func, x_range, y_range, steps=50, trajectory=trajectory)
+
+
 # === Gradient descent
+
 
 def isScheduling(algorithm):
     return hasattr(algorithm, "__code__") and algorithm.__code__.co_argcount == 1
+
 
 def gradient_descent(
     func: Func,
@@ -109,19 +140,20 @@ def gradient_descent(
     learning,
     limit: float = 1e3,
     eps: float = 1e-6,
-    on_error = 0.1,
-    draw3d: bool = False, 
+    on_error=0.1,
+    draw2d: bool = False,
+    draw3d: bool = False,
 ) -> Tuple[Vector, int]:
     x = start.copy()
-    trajectory = [x.copy()] if draw3d else None
+    trajectory = [x.copy()] if (draw3d or draw2d) else None
     k = 0
 
     while True:
         gradient = func.gradient(x)
         u = -gradient
         alpha = learning(k) if isScheduling(learning) else learning(func, x, u)
-        alpha = on_error if alpha is None else alpha #scipy algorithms can give Nones
-        
+        alpha = on_error if alpha is None else alpha  # scipy algorithms can give Nones
+
         x += alpha * u
         if trajectory is not None:
             trajectory.append(x.copy())
@@ -129,23 +161,29 @@ def gradient_descent(
         if np.linalg.norm(gradient) ** 2 < eps or k > limit:
             break
         k += 1
-    try_draw_gradient(func, draw3d, trajectory)
+
+    try_draw_gradient(func, draw2d, draw3d, trajectory)
     return x, func.count
 
 
 # === Learnings
 
+
 def h(k: int) -> float:
     return 1 / (k + 1) ** 0.5
+
 
 def constant(λ: float) -> Scheduling:
     return lambda k: λ
 
+
 def geometric() -> Scheduling:
     return lambda k: h(k) / 2**k
 
+
 def exponential_decay(λ: float) -> Scheduling:
     return lambda k: h(k) * np.exp(-λ * k)
+
 
 def polynomial_decay(α: float, β: float) -> Scheduling:
     return lambda k: h(k) * (β * k + 1) ** -α
@@ -153,14 +191,16 @@ def polynomial_decay(α: float, β: float) -> Scheduling:
 
 # === Rules
 
+
 def armijo_rule(func: Func, x: Vector, direction: Vector) -> float:
-    α: float = 0.5
-    q: float = 0.5
-    c: float = 0.4
+    α: float = 0.9
+    q: float = 0.4
+    c: float = 0.3
     while True:
         if func(x + α * direction) <= func(x) + c * α * np.linalg.norm(direction):
             return α
         α *= q
+
 
 def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
     α: float = 0.5
@@ -183,8 +223,10 @@ def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
 
 # === Scipy
 
+
 def scipy_wolfe(func: Func, x: Vector, direction: Vector) -> float:
     return line_search_wolfe1(func, func.gradient, x, direction)[0]
+
 
 def scipy_armijo(func: Func, x: Vector, direction: Vector) -> float:
     return scalar_search_armijo(
@@ -197,6 +239,7 @@ def scipy_armijo(func: Func, x: Vector, direction: Vector) -> float:
 
 
 # === Data container
+
 
 class AlgoData:
     def __init__(self, name, algo):
@@ -213,20 +256,26 @@ class AlgoData:
 
 def print_algorithms(algos, f, start):
     table = PrettyTable()
-    table.field_names = ["Method"] + ["Coordinate " + str(i + 1) for i in range(len(start))]+ ["Steps"]
+    table.field_names = (
+        ["Method"] + ["Coordinate " + str(i + 1) for i in range(len(start))] + ["Steps"]
+    )
     table.add_rows(
         sorted(
-        [alg.get_data(f, start) for alg in algos],
-        key=lambda x: (f(x[1:-1]), x[-1]) #sort by efficiency of minimizing, then by amount of steps
-        ))
+            [alg.get_data(f, start) for alg in algos],
+            key=lambda x: (
+                f(x[1:-1]),
+                x[-1],
+            ),  # sort by efficiency of minimizing, then by amount of steps
+        )
+    )
     print(table)
 
 
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = Func(lambda x: 2*x**2)
-    start_point = np.array([-42.0])
+    testing_func = Func(lambda x, y: 2*x**2 + 3*y**2 + np.arctan(x))
+    start_point = np.array([420.0, 10])
 
     testing_algorithms = [
         AlgoData("Constant", constant(0.05)),
@@ -239,5 +288,5 @@ if __name__ == "__main__":
     ]
     print_algorithms(testing_algorithms, testing_func, start_point)
 
-    #draw example
-    #gradient_descent(testing_func, start_point, armijo_rule, draw3d=True)
+    # draw example
+    #gradient_descent(testing_func, start_point, wolfe_rule, draw2d = False, draw3d=True)
