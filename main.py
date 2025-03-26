@@ -209,13 +209,14 @@ class AlgoData:
 
 # === Output
 
+
 def print_algorithms(algos, f, start):
     table = PrettyTable()
     table.field_names = ["Method", "Coordinate X", "Coordinate Y", "Steps"]
     table.add_rows(
         sorted(
         [alg.get_data(f, start) for alg in algos],
-        key=lambda x: x[-1] #sort by amount of steps
+        key=lambda x: (f([x[1],x[2]]), x[-1]) #sort by efficiency of minimizing, then by amount of steps
         ))
     print(table)
 
@@ -223,7 +224,7 @@ def print_algorithms(algos, f, start):
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = BiFunc(lambda x, y: x + y**2)
+    testing_func = BiFunc(lambda x, y: 2*x**2 + 3*y**2 + np.arctan(x))
     start_point = np.array([-42.0, 31.0])
 
     testing_algorithms = [
@@ -238,4 +239,4 @@ if __name__ == "__main__":
     print_algorithms(testing_algorithms, testing_func, start_point)
 
     #draw example
-    gradient_descent(testing_func, start_point, armijo_rule, draw3d=True)
+    #gradient_descent(testing_func, start_point, armijo_rule, draw3d=True)
