@@ -4,6 +4,7 @@ from prettytable import PrettyTable
 from typing import Callable, Tuple
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import random
 
 
 # === Constants
@@ -16,8 +17,8 @@ SYSTEM_EPS = np.sqrt(np.finfo(float).eps)
 
 # === Function wrapper
 
-class BiFunc:
-    Type = Callable[[float, float], float]
+class Func:
+    Type = Callable[..., float]
     func: Type
     count: int
 
@@ -26,7 +27,7 @@ class BiFunc:
         self.count = 0
 
     def __call__(self, x: Vector) -> float:
-        return self.func(x[0], x[1])
+        return self.func(*x)
 
     def gradient(self, x: Vector, ε: float = SYSTEM_EPS) -> Vector:
         self.count += 1
@@ -40,10 +41,10 @@ class BiFunc:
         return gradient
 
 
-# === 3D-visualization of BiFunc with path trajectory if given
+# === 3D-visualization of Func with path trajectory if given
 
 def plot_3d_func(
-    func: BiFunc,
+    func: Func,
     x_range: Tuple[float, float],
     y_range: Tuple[float, float],
     steps: int = 50,
@@ -78,7 +79,7 @@ def plot_3d_func(
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("f(x,y)")
-    ax.set_title("3D график BiFunc")
+    ax.set_title("3D график Func")
 
     ax.legend()
     
@@ -103,7 +104,7 @@ def isScheduling(algorithm):
     return hasattr(algorithm, "__code__") and algorithm.__code__.co_argcount == 1
 
 def gradient_descent(
-    func: BiFunc,
+    func: Func,
     start: Vector,
     learning,
     limit: float = 1e3,
@@ -152,7 +153,7 @@ def polynomial_decay(α: float, β: float) -> Scheduling:
 
 # === Rules
 
-def armijo_rule(func: BiFunc, x: Vector, direction: Vector) -> float:
+def armijo_rule(func: Func, x: Vector, direction: Vector) -> float:
     α: float = 0.5
     q: float = 0.5
     c: float = 0.4
@@ -161,7 +162,7 @@ def armijo_rule(func: BiFunc, x: Vector, direction: Vector) -> float:
             return α
         α *= q
 
-def wolfe_rule(func: BiFunc, x: Vector, direction: Vector) -> float:
+def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
     α: float = 0.5
     c1: float = 1e-4
     c2: float = 0.3
@@ -182,10 +183,10 @@ def wolfe_rule(func: BiFunc, x: Vector, direction: Vector) -> float:
 
 # === Scipy
 
-def scipy_wolfe(func: BiFunc, x: Vector, direction: Vector) -> float:
+def scipy_wolfe(func: Func, x: Vector, direction: Vector) -> float:
     return line_search_wolfe1(func, func.gradient, x, direction)[0]
 
-def scipy_armijo(func: BiFunc, x: Vector, direction: Vector) -> float:
+def scipy_armijo(func: Func, x: Vector, direction: Vector) -> float:
     return scalar_search_armijo(
         phi=lambda a: func(x + a * direction),
         phi0=func(x),
@@ -212,11 +213,11 @@ class AlgoData:
 
 def print_algorithms(algos, f, start):
     table = PrettyTable()
-    table.field_names = ["Method", "Coordinate X", "Coordinate Y", "Steps"]
+    table.field_names = ["Method"] + ["Coordinate " + str(i + 1) for i in range(len(start))]+ ["Steps"]
     table.add_rows(
         sorted(
         [alg.get_data(f, start) for alg in algos],
-        key=lambda x: (f([x[1],x[2]]), x[-1]) #sort by efficiency of minimizing, then by amount of steps
+        key=lambda x: (f(x[1:-1]), x[-1]) #sort by efficiency of minimizing, then by amount of steps
         ))
     print(table)
 
@@ -224,8 +225,8 @@ def print_algorithms(algos, f, start):
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = BiFunc(lambda x, y: 2*x**2 + 3*y**2 + np.arctan(x))
-    start_point = np.array([-42.0, 31.0])
+    testing_func = Func(lambda x: 2*x**2)
+    start_point = np.array([-42.0])
 
     testing_algorithms = [
         AlgoData("Constant", constant(0.05)),
