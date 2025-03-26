@@ -3,7 +3,6 @@ from scipy.optimize._linesearch import line_search_wolfe1, scalar_search_armijo
 from prettytable import PrettyTable
 from typing import Callable, Tuple
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # === Constants
 
@@ -192,10 +191,15 @@ def polynomial_decay(α: float, β: float) -> Scheduling:
 # === Rules
 
 
-def armijo_rule(func: Func, x: Vector, direction: Vector) -> float:
-    α: float = 0.5
-    q: float = 0.5
+def armijo_rule(
+    func: Func,
+    x: Vector,
+    direction: Vector,
+    α: float = 0.5,
+    q: float = 0.5,
     c: float = 0.4
+    ) -> float:
+
     max_iter: int = 80
     for i in range(max_iter):
         if func(x + α * direction) <= func(x) + c * α * np.linalg.norm(direction):
@@ -203,10 +207,16 @@ def armijo_rule(func: Func, x: Vector, direction: Vector) -> float:
         α *= q
     return None
 
-def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
-    α: float = 0.5
-    c1: float = 1e-4
-    c2: float = 0.3
+
+def wolfe_rule(
+    func: Func,
+    x: Vector,
+    direction: Vector, 
+    α: float = 0.5,
+    c1: float = 1e-4,
+    c2: float = 0.3,
+    ) -> float:
+
     max_iter: int = 80
     for _ in range(max_iter):
         if func(x + α * direction) > func(x) + c1 * α * np.dot(
@@ -221,6 +231,11 @@ def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
             return α
     return None
 
+def armijo_rule_gen(a, c, q):
+    return lambda f,x,u: armijo_rule(f,x,u,α=a, c=c, q=q)
+
+def wolfe_rule_gen(a, c1,c2):
+    return lambda f,x,u: wolfe_rule(f,x,u,α=a,c1=c1,c2=c2) 
 
 # === Scipy
 
@@ -275,14 +290,17 @@ def print_algorithms(algos, f, start):
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = Func(lambda x, y: x**2 + y**2)
-    start_point = np.array([420.0, 100])
+    testing_func = Func(lambda x, y, z: 3*x**2 + 4*y**2 + z**2)
+    start_point = np.array([420.0, 100, 10])
 
     testing_algorithms = [
-        AlgoData("Constant", constant(0.05)),
+        AlgoData("Constant Small", constant(0.05)),
+        AlgoData("Constant Big", constant(0.3)),
         AlgoData("Exponential Decay", exponential_decay(0.01)),
         AlgoData("Polynomial Decay", polynomial_decay(0.5, 1)),
-        AlgoData("Armijo Rule", armijo_rule),
+
+        AlgoData("Armijo Default", armijo_rule),
+        AlgoData("Armijo Custom", armijo_rule_gen(0.8, 0.01, 0.3)),
         AlgoData("Wolfe Rule", wolfe_rule),
         AlgoData("SciPy Armijo", scipy_armijo),
         AlgoData("SciPy Wolfe", scipy_wolfe),
