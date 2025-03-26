@@ -193,20 +193,21 @@ def polynomial_decay(α: float, β: float) -> Scheduling:
 
 
 def armijo_rule(func: Func, x: Vector, direction: Vector) -> float:
-    α: float = 0.9
-    q: float = 0.4
-    c: float = 0.3
-    while True:
+    α: float = 0.5
+    q: float = 0.5
+    c: float = 0.4
+    max_iter: int = 80
+    for i in range(max_iter):
         if func(x + α * direction) <= func(x) + c * α * np.linalg.norm(direction):
             return α
         α *= q
-
+    return None
 
 def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
     α: float = 0.5
     c1: float = 1e-4
     c2: float = 0.3
-    max_iter: int = 100
+    max_iter: int = 80
     for _ in range(max_iter):
         if func(x + α * direction) > func(x) + c1 * α * np.dot(
             func.gradient(x), direction
@@ -218,7 +219,7 @@ def wolfe_rule(func: Func, x: Vector, direction: Vector) -> float:
             α *= 1.5
         else:
             return α
-    return α
+    return None
 
 
 # === Scipy
@@ -274,8 +275,8 @@ def print_algorithms(algos, f, start):
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = Func(lambda x, y: 2*x**2 + 3*y**2 + np.arctan(x))
-    start_point = np.array([420.0, 10])
+    testing_func = Func(lambda x, y: x**2 + y**2)
+    start_point = np.array([420.0, 100])
 
     testing_algorithms = [
         AlgoData("Constant", constant(0.05)),
