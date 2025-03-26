@@ -40,49 +40,6 @@ class BiFunc:
         return gradient
 
 
-# === 2D-visualization of BiFunc with path trajectory if given
-
-def plot_trajectory(func: BiFunc, trajectory: list) -> None:
-    xs = [point[0] for point in trajectory]
-    ys = [point[1] for point in trajectory]
-
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-
-    pad_x = x_range * 0.1 if x_range != 0 else 1
-    pad_y = y_range * 0.1 if y_range != 0 else 1
-
-    x_min, x_max = x_min - pad_x, x_max + pad_x
-    y_min, y_max = y_min - pad_y, y_max + pad_y
-
-    x_grid = np.linspace(x_min, x_max, 100)
-    y_grid = np.linspace(y_min, y_max, 100)
-
-    X, Y = np.meshgrid(x_grid, y_grid)
-    Z = np.zeros_like(X)
-
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            Z[i, j] = func(np.array([X[i, j], Y[i, j]]))
-
-    plt.figure()
-    cp = plt.contour(X, Y, Z, levels=30)
-
-    plt.clabel(cp, inline=True, fontsize=8)
-    plt.plot(xs, ys, marker="o", label="Траектория")
-    plt.plot(xs[0], ys[0], marker="s", markersize=8, label="Начало")
-    plt.plot(xs[-1], ys[-1], marker="*", markersize=12, label="Конец")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title("Траектория градиентного спуска")
-    plt.legend()
-    plt.savefig("gd.png")
-    #plt.show()
-
-
 # === 3D-visualization of BiFunc with path trajectory if given
 
 def plot_3d_func(
@@ -128,9 +85,9 @@ def plot_3d_func(
     plt.savefig("gd.png")
     #plt.show()
 
-def try_draw_gradient(func, draw, draw3d, trajectory):
-    if draw and trajectory is not None:
-        plot_trajectory(func, trajectory)
+def try_draw_gradient(func, draw3d, trajectory):
+    #if draw and trajectory is not None:
+        #plot_trajectory(func, trajectory)
 
     if draw3d and trajectory is not None:
         xs = [pt[0] for pt in trajectory]
@@ -151,18 +108,19 @@ def gradient_descent(
     learning,
     limit: float = 1e3,
     eps: float = 1e-6,
-    draw: bool = False,
+    on_error = 0.1,
     draw3d: bool = False, 
 ) -> Tuple[Vector, int]:
     x = start.copy()
-    trajectory = [x.copy()] if (draw or draw3d) else None
+    trajectory = [x.copy()] if draw3d else None
     k = 0
 
     while True:
         gradient = func.gradient(x)
         u = -gradient
         alpha = learning(k) if isScheduling(learning) else learning(func, x, u)
-
+        alpha = on_error if alpha is None else alpha #scipy algorithms can give Nones
+        
         x += alpha * u
         if trajectory is not None:
             trajectory.append(x.copy())
@@ -170,7 +128,7 @@ def gradient_descent(
         if np.linalg.norm(gradient) ** 2 < eps or k > limit:
             break
         k += 1
-    try_draw_gradient(func, draw, draw3d, trajectory)
+    try_draw_gradient(func, draw3d, trajectory)
     return x, func.count
 
 
@@ -254,14 +212,18 @@ class AlgoData:
 def print_algorithms(algos, f, start):
     table = PrettyTable()
     table.field_names = ["Method", "Coordinate X", "Coordinate Y", "Steps"]
-    table.add_rows([alg.get_data(f, start) for alg in algos])
+    table.add_rows(
+        sorted(
+        [alg.get_data(f, start) for alg in algos],
+        key=lambda x: x[-1] #sort by amount of steps
+        ))
     print(table)
 
 
 # === Launcher
 
 if __name__ == "__main__":
-    testing_func = BiFunc(lambda x, y: x**2 + x + y**2)
+    testing_func = BiFunc(lambda x, y: x + y**2)
     start_point = np.array([-42.0, 31.0])
 
     testing_algorithms = [
